@@ -1,0 +1,115 @@
+# install nodejs and npm
+- name: Install node and npm
+  hosts: server_web
+  tasks:
+    - name: Update apt repo and cache
+      apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+    - name: Install nodejs and npm
+      apt:
+        pkg:
+          - nodejs
+          - npm
+
+    - name: Update nodejs
+      shell: npm install -g n
+
+    - name: Update nodejs
+      shell: n latest
+
+
+
+# unarchive the project
+- name : Unarchive the project
+  hosts: server_web
+  become: True
+  tasks:
+    - name: Unarchive the project files to the server
+      unarchive:
+        src: final_project.tgz
+        dest: /home/marius
+
+
+# deploy a server mariadb
+- name: Install MariaDB and create database
+  hosts: server_web
+  become: true
+  tasks:
+    - name: Install MariaDB
+      apt:
+        name:
+          - mariadb-server
+          - python3-pymysql
+        state: present
+
+    - name: mysql root password
+      mysql_user:
+        name: root
+        password: "test"
+        login_user: root
+        login_password: "test"
+        login_host: localhost
+        login_port: 3306
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        check_implicit_admin: yes
+        state: present
+
+    - name: Create database test
+      mysql_db:
+        name: test
+        encoding: utf8mb4
+        state: present
+        login_user: root
+        login_password: "test"
+
+    - name: Import database
+      mysql_db:
+        name: test
+        state: import
+        target: /home/marius/final_project/backend/discord_bot.sql
+        login_user: root
+        login_password: "test"
+
+
+      
+# deploy an nodejs app
+- name: Deploy nodejs app
+  hosts: server_web
+  become: True
+  tasks:
+    - name: Install dependencies
+      npm:
+        path: /home/marius/final_project/backend
+    - name: Start the application
+      command:
+        chdir: /home/marius/final_project/backend
+        cmd: npm start
+      async: 1000
+      poll: 0
+    - name: Ensure app is running
+      shell: ps aux | grep node
+      register: app_status
+    - debug: msg={{app_status.stdout_lines}}
+
+
+# deploy an react app
+- name: Deploy react app
+  hosts: server_web
+  become: True
+  tasks:
+    - name: Install dependencies
+      npm:
+        path: /home/marius/final_project/frontend
+    - name: Start the application
+      command:
+        chdir: /home/marius/final_project/frontend
+        cmd: sudo npm run dev
+      async: 1300
+      poll: 0
+
+
+
+
+
+
+
+
