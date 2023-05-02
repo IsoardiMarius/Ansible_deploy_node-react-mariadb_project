@@ -1,32 +1,39 @@
-# install nodejs and npm
-- name: Install node and npm
+# initial deployement requirements
+- name: Initial deployement requirements
   hosts: server_web
   tasks:
     - name: Update apt repo and cache
       apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
-    - name: Install nodejs and npm
+
+    - name: Install git
+      apt: name=git state=present
+
+    - name: Install curl
+      apt:
+        pkg:
+          - curl
+
+    - name: Clone project from GitHub
+      git:
+        repo: https://github.com/IsoardiMarius/final_project_ansible.git
+        dest: /home/marius/final_project
+        version: main
+        recursive: true
+        clone: yes
+
+
+# install nodejs and npm
+- name: Install node and npm
+  hosts: server_web
+  tasks:
+    - name: Get nodejs repo
+      shell: curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+
+    - name: Install nodejs
       apt:
         pkg:
           - nodejs
-          - npm
 
-    - name: Update nodejs
-      shell: npm install -g n
-
-    - name: Update nodejs
-      shell: n latest
-
-
-
-# unarchive the project
-- name : Unarchive the project
-  hosts: server_web
-  become: True
-  tasks:
-    - name: Unarchive the project files to the server
-      unarchive:
-        src: final_project.tgz
-        dest: /home/marius
 
 
 # deploy a server mariadb
@@ -41,7 +48,7 @@
           - python3-pymysql
         state: present
 
-    - name: mysql root password
+    - name: Create User mysql
       mysql_user:
         name: root
         password: "test"
@@ -70,7 +77,7 @@
         login_password: "test"
 
 
-      
+
 # deploy an nodejs app
 - name: Deploy nodejs app
   hosts: server_web
@@ -85,10 +92,6 @@
         cmd: npm start
       async: 1000
       poll: 0
-    - name: Ensure app is running
-      shell: ps aux | grep node
-      register: app_status
-    - debug: msg={{app_status.stdout_lines}}
 
 
 # deploy an react app
@@ -102,9 +105,20 @@
     - name: Start the application
       command:
         chdir: /home/marius/final_project/frontend
+        # TODO: change cmd to npm run build
         cmd: sudo npm run dev
       async: 1300
       poll: 0
+
+- name: Ensure app is running
+  hosts: server_web
+  become: True
+  tasks:
+    - name: Display all ports in use on the server
+      shell: sudo netstat -tlnp
+      register: app_status
+      async: 1700
+    - debug: msg={{app_status.stdout_lines}}
 
 
 
